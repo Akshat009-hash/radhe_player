@@ -3,53 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Official Player</title>
+    <title>Spider Universal Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 15px; }
-        
-        /* Input Area */
         #inputWrapper { width: 100%; max-width: 500px; text-align: center; }
-        input[type="text"] { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #333; background: #1a1a1a; color: white; outline: none; margin-bottom: 10px; font-size: 16px; }
+        input[type="text"] { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #333; background: #1a1a1a; color: white; outline: none; margin-bottom: 10px; font-size: 14px; }
         .play-btn { width: 100%; background: #ff0000; color: white; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; font-size: 16px; }
-
-        /* Player Wrapper */
         .player-wrapper { width: 100%; max-width: 850px; background: #111; border-radius: 15px; overflow: hidden; display: none; box-shadow: 0 20px 40px rgba(0,0,0,0.9); }
         video { width: 100%; aspect-ratio: 16/9; background: #000; display: block; }
-        
-        .controls { padding: 15px; background: #1a1a1a; display: flex; flex-direction: column; gap: 10px; }
-        
-        /* Buttons Style */
-        .btn-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .controls { padding: 15px; background: #1a1a1a; }
+        .btn-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         button, select { background: #333; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        
-        /* Copy Button (Special Blue) */
         .share-btn { width: 100%; background: #007bff; color: white; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; margin-top: 10px; }
-        
-        .new-btn { background: #444; }
     </style>
 </head>
 <body>
 
     <div id="inputWrapper">
-        <input type="text" id="videoUrl" placeholder="Video Direct Link Paste Karein...">
-        <button class="play-btn" onclick="startManual()">Play Video</button>
+        <h2 style="color: #ff0000;">Spider Official</h2>
+        <input type="text" id="videoUrl" placeholder="MP4 ya M3U8 link yahan dalein...">
+        <button class="play-btn" onclick="startManual()">Play Now</button>
     </div>
 
     <div id="playerContainer" class="player-wrapper">
-        <video id="mainVid" playsinline controls></video>
-        
+        <video id="mainVid" playsinline controls crossorigin="anonymous"></video>
         <div class="controls">
             <div class="btn-row">
                 <select onchange="mainVid.playbackRate=this.value">
                     <option value="1">1x Speed</option>
                     <option value="1.5">1.5x</option>
-                    <option value="2">2x Speed</option>
+                    <option value="2">2x</option>
                 </select>
-                <button class="new-btn" onclick="location.reload()">+ New Video</button>
+                <button onclick="location.reload()">New Link</button>
             </div>
-
-            <button id="copyBtn" class="share-btn" onclick="generateAndCopy()">🔗 Copy Encrypted Share Link</button>
+            <button id="copyBtn" class="share-btn" onclick="generateAndCopy()">🔗 Copy Share Link</button>
         </div>
     </div>
 
@@ -60,52 +49,54 @@
     const urlInput = document.getElementById('videoUrl');
     let savedRawUrl = "";
 
-    // Auto-load if link has ?v= parameter
     window.onload = function() {
         const params = new URLSearchParams(window.location.search);
         const encoded = params.get('v');
         if(encoded) {
-            try {
-                const decoded = atob(encoded);
-                loadPlayer(decoded);
-            } catch(e) { alert("Invalid encrypted link!"); }
+            try { loadPlayer(atob(encoded)); } catch(e) {}
         }
     };
 
     function startManual() {
         const url = urlInput.value.trim();
-        if(url) {
-            savedRawUrl = url;
-            loadPlayer(url);
-        } else {
-            alert("Pehle link toh dalo!");
-        }
+        if(url) loadPlayer(url);
     }
 
     function loadPlayer(url) {
-        savedRawUrl = url; // Link ko memory mein save rakha copy karne ke liye
-        mainVid.src = url;
+        savedRawUrl = url;
         inputWrapper.style.display = 'none';
         playerContainer.style.display = 'block';
-        mainVid.play();
+
+        // Check if link is .m3u8
+        if (url.includes('.m3u8')) {
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(mainVid);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    mainVid.play();
+                });
+            } 
+            // For Safari (iPhone/Mac) which supports HLS natively
+            else if (mainVid.canPlayType('application/vnd.apple.mpegurl')) {
+                mainVid.src = url;
+                mainVid.addEventListener('loadedmetadata', function() {
+                    mainVid.play();
+                });
+            }
+        } else {
+            // Normal MP4 handling
+            mainVid.src = url;
+            mainVid.play().catch(e => console.log("Autoplay blocked"));
+        }
     }
 
     function generateAndCopy() {
         if(!savedRawUrl) return;
-        
-        // Link ko encrypt (Base64) karna
-        const encrypted = btoa(savedRawUrl);
-        // Full URL banana jo player ko open karega
-        const sharePath = window.location.origin + window.location.pathname + "?v=" + encrypted;
-        
+        const sharePath = window.location.origin + window.location.pathname + "?v=" + btoa(savedRawUrl);
         navigator.clipboard.writeText(sharePath).then(() => {
-            const btn = document.getElementById('copyBtn');
-            btn.innerText = "✅ Link Copied! Share it.";
-            btn.style.background = "#28a745";
-            setTimeout(() => {
-                btn.innerText = "🔗 Copy Encrypted Share Link";
-                btn.style.background = "#007bff";
-            }, 3000);
+            document.getElementById('copyBtn').innerText = "✅ Link Copied!";
+            setTimeout(() => document.getElementById('copyBtn').innerText = "🔗 Copy Share Link", 2000);
         });
     }
 </script>
