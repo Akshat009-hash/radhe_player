@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>🕷️ Spider Player</title>
+
+<style>
+body {
+  margin: 0;
+  background: black;
+  font-family: Arial;
+}
+
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 10px;
+  color: white;
+}
+
+.player-box {
+  position: relative;
+}
+
+video {
+  width: 100%;
+  background: black;
+}
+
+/* touch zones */
+.zone {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+}
+
+.left { left: 0; }
+.right { right: 0; }
+
+/* overlay animation */
+.overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 40px;
+  opacity: 0;
+  transition: 0.3s;
+}
+
+/* controls */
+.controls {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+button, select {
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h3>🕷️ Spider Player</h3>
+
+<input type="text" id="videoUrl" placeholder="Paste video link">
+
+<div class="player-box">
+  <video id="player" controls controlsList="nodownload"></video>
+
+  <div class="zone left" ontouchend="tap('left')"></div>
+  <div class="zone right" ontouchend="tap('right')"></div>
+
+  <div id="overlay" class="overlay">⏩</div>
+</div>
+
+<div class="controls">
+  <button onclick="playVideo()">▶ Play</button>
+  <button onclick="fullscreen()">⛶ Full</button>
+  <button onclick="share()">🔗 Share</button>
+
+  <select onchange="setSpeed(this.value)">
+    <option value="0.5">0.5x</option>
+    <option value="1" selected>1x</option>
+    <option value="1.5">1.5x</option>
+    <option value="2">2x</option>
+  </select>
+</div>
+
+</div>
+
+<script>
+
+let lastTap = 0;
+
+// ▶ play
+function playVideo() {
+  let url = document.getElementById("videoUrl").value;
+  let player = document.getElementById("player");
+
+  player.src = url;
+  player.play();
+
+  window.history.replaceState(null, null, "?video=" + encodeURIComponent(url));
+}
+
+// double tap
+function tap(side) {
+  let now = new Date().getTime();
+  let diff = now - lastTap;
+
+  if (diff < 300 && diff > 0) {
+    let player = document.getElementById("player");
+    let overlay = document.getElementById("overlay");
+
+    if (side === "left") {
+      player.currentTime -= 10;
+      overlay.innerText = "⏪";
+    } else {
+      player.currentTime += 10;
+      overlay.innerText = "⏩";
+    }
+
+    overlay.style.opacity = 1;
+
+    setTimeout(() => {
+      overlay.style.opacity = 0;
+    }, 300);
+  }
+
+  lastTap = now;
+}
+
+// speed
+function setSpeed(speed) {
+  document.getElementById("player").playbackRate = speed;
+}
+
+// fullscreen
+function fullscreen() {
+  let v = document.getElementById("player");
+
+  if (!document.fullscreenElement) {
+    v.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+// share
+function share() {
+  navigator.clipboard.writeText(window.location.href);
+  alert("Link copied 🔥");
+}
+
+// auto load
+window.onload = function() {
+  let p = new URLSearchParams(window.location.search);
+  let v = p.get("video");
+
+  if (v) {
+    document.getElementById("videoUrl").value = v;
+    document.getElementById("player").src = v;
+  }
+}
+
+// disable right click
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+</script>
+
+</body>
+</html>
