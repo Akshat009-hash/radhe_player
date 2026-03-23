@@ -3,101 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Universal Player</title>
+    <title>Spider Master Player</title>
+    
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 15px; }
-        #inputWrapper { width: 100%; max-width: 500px; text-align: center; }
-        input[type="text"] { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #333; background: #1a1a1a; color: white; outline: none; margin-bottom: 10px; font-size: 14px; }
-        .play-btn { width: 100%; background: #ff0000; color: white; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; font-size: 16px; }
-        .player-wrapper { width: 100%; max-width: 850px; background: #111; border-radius: 15px; overflow: hidden; display: none; box-shadow: 0 20px 40px rgba(0,0,0,0.9); }
-        video { width: 100%; aspect-ratio: 16/9; background: #000; display: block; }
-        .controls { padding: 15px; background: #1a1a1a; }
-        .btn-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-        button, select { background: #333; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .share-btn { width: 100%; background: #007bff; color: white; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; margin-top: 10px; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+        .container { width: 100%; max-width: 900px; padding: 20px; }
+        #inputArea { background: #111; padding: 20px; border-radius: 12px; margin-bottom: 20px; width: 100%; }
+        input { width: 100%; padding: 15px; background: #222; border: 1px solid #333; color: #fff; border-radius: 8px; margin-bottom: 10px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .play-btn { background: #ff0000; color: white; }
+        
+        /* Plyr Custom Theme */
+        :root { --plyr-color-main: #ff0000; }
+        .player-wrapper { display: none; width: 100%; border-radius: 12px; overflow: hidden; }
     </style>
 </head>
 <body>
 
-    <div id="inputWrapper">
-        <h2 style="color: #ff0000;">Spider Official</h2>
-        <input type="text" id="videoUrl" placeholder="MP4 ya M3U8 link yahan dalein...">
-        <button class="play-btn" onclick="startManual()">Play Now</button>
+<div class="container">
+    <div id="inputArea">
+        <h2 style="text-align: center;">Spider Quality Selector</h2>
+        <input type="text" id="linkInput" placeholder="Paste your master.m3u8 link here...">
+        <button class="btn play-btn" onclick="initPlayer()">Play with Quality Options</button>
     </div>
 
-    <div id="playerContainer" class="player-wrapper">
-        <video id="mainVid" playsinline controls crossorigin="anonymous"></video>
-        <div class="controls">
-            <div class="btn-row">
-                <select onchange="mainVid.playbackRate=this.value">
-                    <option value="1">1x Speed</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2">2x</option>
-                </select>
-                <button onclick="location.reload()">New Link</button>
-            </div>
-            <button id="copyBtn" class="share-btn" onclick="generateAndCopy()">🔗 Copy Share Link</button>
+    <div id="playerWrapper" class="player-wrapper">
+        <video id="videoPlayer" playsinline controls crossorigin="anonymous"></video>
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
+            <button class="btn" style="background:#007bff; color:white;" onclick="copyLink()">Copy Encrypted Link</button>
+            <button class="btn" style="background:#333; color:white;" onclick="location.reload()">New Video</button>
         </div>
     </div>
+</div>
 
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <script>
-    const mainVid = document.getElementById('mainVid');
-    const inputWrapper = document.getElementById('inputWrapper');
-    const playerContainer = document.getElementById('playerContainer');
-    const urlInput = document.getElementById('videoUrl');
-    let savedRawUrl = "";
+    let player;
+    let hls;
+
+    function initPlayer() {
+        const url = document.getElementById('linkInput').value.trim();
+        if(!url) return alert("Link toh dalo!");
+
+        document.getElementById('inputArea').style.display = 'none';
+        document.getElementById('playerWrapper').style.display = 'block';
+
+        const video = document.getElementById('videoPlayer');
+
+        if (Hls.isSupported()) {
+            hls = new Hls({
+                // Yeh settings buffers aur quality switch ko smooth banati hain
+                enableWorker: true,
+                lowLatencyMode: true,
+            });
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                // Available qualities nikalna (e.g. 720, 480, 360)
+                const availableQualities = hls.levels.map((l) => l.height);
+                availableQualities.unshift(0); // 'Auto' option ke liye
+
+                player = new Plyr(video, {
+                    settings: ['quality', 'speed'],
+                    quality: {
+                        default: 0,
+                        options: availableQualities,
+                        forced: true,
+                        onChange: (q) => {
+                            if (q === 0) {
+                                hls.currentLevel = -1; // Auto quality
+                            } else {
+                                hls.levels.forEach((level, index) => {
+                                    if (level.height === q) hls.currentLevel = index;
+                                });
+                            }
+                        },
+                    },
+                    i18n: { quality: 'Quality', speed: 'Speed' },
+                    speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+                });
+            });
+        } 
+        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Safari native support
+            video.src = url;
+            player = new Plyr(video);
+        }
+    }
+
+    function copyLink() {
+        const url = document.getElementById('linkInput').value.trim();
+        const encrypted = btoa(url);
+        const shareURL = window.location.origin + window.location.pathname + "?v=" + encrypted;
+        navigator.clipboard.writeText(shareURL).then(() => alert("Encrypted Link Copied!"));
+    }
 
     window.onload = function() {
         const params = new URLSearchParams(window.location.search);
-        const encoded = params.get('v');
-        if(encoded) {
-            try { loadPlayer(atob(encoded)); } catch(e) {}
+        const v = params.get('v');
+        if(v) {
+            document.getElementById('linkInput').value = atob(v);
+            initPlayer();
         }
-    };
-
-    function startManual() {
-        const url = urlInput.value.trim();
-        if(url) loadPlayer(url);
-    }
-
-    function loadPlayer(url) {
-        savedRawUrl = url;
-        inputWrapper.style.display = 'none';
-        playerContainer.style.display = 'block';
-
-        // Check if link is .m3u8
-        if (url.includes('.m3u8')) {
-            if (Hls.isSupported()) {
-                const hls = new Hls();
-                hls.loadSource(url);
-                hls.attachMedia(mainVid);
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    mainVid.play();
-                });
-            } 
-            // For Safari (iPhone/Mac) which supports HLS natively
-            else if (mainVid.canPlayType('application/vnd.apple.mpegurl')) {
-                mainVid.src = url;
-                mainVid.addEventListener('loadedmetadata', function() {
-                    mainVid.play();
-                });
-            }
-        } else {
-            // Normal MP4 handling
-            mainVid.src = url;
-            mainVid.play().catch(e => console.log("Autoplay blocked"));
-        }
-    }
-
-    function generateAndCopy() {
-        if(!savedRawUrl) return;
-        const sharePath = window.location.origin + window.location.pathname + "?v=" + btoa(savedRawUrl);
-        navigator.clipboard.writeText(sharePath).then(() => {
-            document.getElementById('copyBtn').innerText = "✅ Link Copied!";
-            setTimeout(() => document.getElementById('copyBtn').innerText = "🔗 Copy Share Link", 2000);
-        });
     }
 </script>
 
