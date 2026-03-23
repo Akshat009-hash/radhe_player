@@ -3,42 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Auto Player</title>
+    <title>Spider Official Player</title>
     <style>
-        /* CSS Same as before with minor tweaks */
         * { box-sizing: border-box; }
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 15px; }
-        #inputWrapper { width: 100%; max-width: 500px; margin-bottom: 20px; text-align: center; }
-        input[type="text"] { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #333; background: #1a1a1a; color: white; outline: none; margin-bottom: 10px; }
-        .btn { width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; margin-bottom: 5px; }
-        .play-btn { background: #ff0000; color: white; }
-        .copy-btn { background: #007bff; color: white; display: none; }
-        .player-wrapper { width: 100%; max-width: 800px; background: #111; border-radius: 15px; overflow: hidden; display: none; box-shadow: 0 20px 40px rgba(0,0,0,0.9); }
+        
+        /* Input Area */
+        #inputWrapper { width: 100%; max-width: 500px; text-align: center; }
+        input[type="text"] { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #333; background: #1a1a1a; color: white; outline: none; margin-bottom: 10px; font-size: 16px; }
+        .play-btn { width: 100%; background: #ff0000; color: white; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; font-size: 16px; }
+
+        /* Player Wrapper */
+        .player-wrapper { width: 100%; max-width: 850px; background: #111; border-radius: 15px; overflow: hidden; display: none; box-shadow: 0 20px 40px rgba(0,0,0,0.9); }
         video { width: 100%; aspect-ratio: 16/9; background: #000; display: block; }
-        .controls { padding: 15px; background: #1a1a1a; }
-        .buttons-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        button, select { background: #333; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; }
+        
+        .controls { padding: 15px; background: #1a1a1a; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Buttons Style */
+        .btn-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        button, select { background: #333; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        /* Copy Button (Special Blue) */
+        .share-btn { width: 100%; background: #007bff; color: white; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; margin-top: 10px; }
+        
+        .new-btn { background: #444; }
     </style>
 </head>
 <body>
 
     <div id="inputWrapper">
-        <input type="text" id="videoUrl" placeholder="Video link yahan dalein...">
-        <button class="btn play-btn" onclick="manualLoad()">Play Video</button>
-        <button class="btn copy-btn" id="shareBtn" onclick="copyShareLink()">🔗 Copy Shareable Player Link</button>
+        <input type="text" id="videoUrl" placeholder="Video Direct Link Paste Karein...">
+        <button class="play-btn" onclick="startManual()">Play Video</button>
     </div>
 
     <div id="playerContainer" class="player-wrapper">
         <video id="mainVid" playsinline controls></video>
+        
         <div class="controls">
-            <div class="buttons-row">
+            <div class="btn-row">
                 <select onchange="mainVid.playbackRate=this.value">
                     <option value="1">1x Speed</option>
                     <option value="1.5">1.5x</option>
-                    <option value="2">2x</option>
+                    <option value="2">2x Speed</option>
                 </select>
-                <button onclick="location.reload()">New Link</button>
+                <button class="new-btn" onclick="location.reload()">+ New Video</button>
             </div>
+
+            <button id="copyBtn" class="share-btn" onclick="generateAndCopy()">🔗 Copy Encrypted Share Link</button>
         </div>
     </div>
 
@@ -46,49 +57,56 @@
     const mainVid = document.getElementById('mainVid');
     const inputWrapper = document.getElementById('inputWrapper');
     const playerContainer = document.getElementById('playerContainer');
-    const shareBtn = document.getElementById('shareBtn');
+    const urlInput = document.getElementById('videoUrl');
+    let savedRawUrl = "";
 
-    // 1. Check if URL has an encrypted video link on load
+    // Auto-load if link has ?v= parameter
     window.onload = function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const encodedUrl = urlParams.get('v');
-        
-        if(encodedUrl) {
+        const params = new URLSearchParams(window.location.search);
+        const encoded = params.get('v');
+        if(encoded) {
             try {
-                const decodedUrl = atob(encodedUrl); // Decrypting link
-                startPlayer(decodedUrl);
-            } catch(e) {
-                console.error("Invalid Link");
-            }
+                const decoded = atob(encoded);
+                loadPlayer(decoded);
+            } catch(e) { alert("Invalid encrypted link!"); }
         }
     };
 
-    function manualLoad() {
-        const url = document.getElementById('videoUrl').value.trim();
+    function startManual() {
+        const url = urlInput.value.trim();
         if(url) {
-            startPlayer(url);
-            shareBtn.style.display = 'block'; // Show copy button
+            savedRawUrl = url;
+            loadPlayer(url);
+        } else {
+            alert("Pehle link toh dalo!");
         }
     }
 
-    function startPlayer(url) {
+    function loadPlayer(url) {
+        savedRawUrl = url; // Link ko memory mein save rakha copy karne ke liye
         mainVid.src = url;
         inputWrapper.style.display = 'none';
         playerContainer.style.display = 'block';
         mainVid.play();
     }
 
-    // 2. Encrypt and Create Shareable Link
-    function copyShareLink() {
-        const url = document.getElementById('videoUrl').value.trim();
-        if(url) {
-            const encrypted = btoa(url);
-            const shareablePath = window.location.origin + window.location.pathname + "?v=" + encrypted;
-            
-            navigator.clipboard.writeText(shareablePath).then(() => {
-                alert("Shareable Link Copied! Ab aap ise bhej sakte hain.");
-            });
-        }
+    function generateAndCopy() {
+        if(!savedRawUrl) return;
+        
+        // Link ko encrypt (Base64) karna
+        const encrypted = btoa(savedRawUrl);
+        // Full URL banana jo player ko open karega
+        const sharePath = window.location.origin + window.location.pathname + "?v=" + encrypted;
+        
+        navigator.clipboard.writeText(sharePath).then(() => {
+            const btn = document.getElementById('copyBtn');
+            btn.innerText = "✅ Link Copied! Share it.";
+            btn.style.background = "#28a745";
+            setTimeout(() => {
+                btn.innerText = "🔗 Copy Encrypted Share Link";
+                btn.style.background = "#007bff";
+            }, 3000);
+        });
     }
 </script>
 
