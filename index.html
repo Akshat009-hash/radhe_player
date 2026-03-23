@@ -3,145 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Secure Player</title>
+    <title>Spider Auto Player</title>
     <style>
+        /* CSS Same as before with minor tweaks */
         * { box-sizing: border-box; }
-        body { 
-            margin: 0; background: #000; color: #fff; 
-            font-family: 'Segoe UI', sans-serif; 
-            display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; 
-            min-height: 100vh; padding: 15px;
-        }
-        
-        /* Input Section */
-        #inputWrapper {
-            width: 100%; max-width: 500px; margin-bottom: 20px;
-            transition: 0.5s;
-        }
-        input[type="text"] {
-            width: 100%; padding: 15px; border-radius: 10px;
-            border: 2px solid #333; background: #1a1a1a; color: white;
-            outline: none; font-size: 16px; margin-bottom: 10px;
-        }
-        .load-btn {
-            width: 100%; background: #ff0000; color: white; border: none;
-            padding: 12px; border-radius: 10px; font-weight: bold; 
-            font-size: 16px; cursor: pointer;
-        }
-
-        /* Player Design */
-        .player-wrapper {
-            width: 100%; max-width: 800px; background: #111;
-            border-radius: 15px; overflow: hidden; 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.9);
-            display: none; /* Pehle hide rahega jab tak link na dale */
-        }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 15px; }
+        #inputWrapper { width: 100%; max-width: 500px; margin-bottom: 20px; text-align: center; }
+        input[type="text"] { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #333; background: #1a1a1a; color: white; outline: none; margin-bottom: 10px; }
+        .btn { width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; margin-bottom: 5px; }
+        .play-btn { background: #ff0000; color: white; }
+        .copy-btn { background: #007bff; color: white; display: none; }
+        .player-wrapper { width: 100%; max-width: 800px; background: #111; border-radius: 15px; overflow: hidden; display: none; box-shadow: 0 20px 40px rgba(0,0,0,0.9); }
         video { width: 100%; aspect-ratio: 16/9; background: #000; display: block; }
-
         .controls { padding: 15px; background: #1a1a1a; }
-        
-        /* Modern Seek Bar */
-        input[type="range"] { 
-            width: 100%; height: 6px; accent-color: #ff0000; 
-            cursor: pointer; margin-bottom: 15px;
-        }
-
-        .buttons-row { 
-            display: flex; justify-content: space-between; 
-            align-items: center; flex-wrap: wrap; gap: 10px;
-        }
-        
-        .btn-group { display: flex; gap: 8px; }
-        
-        button, select { 
-            background: #333; color: white; border: none; 
-            padding: 10px 15px; border-radius: 8px; 
-            font-size: 14px; cursor: pointer; font-weight: 600;
-        }
-        button:active { background: #444; transform: scale(0.95); }
-
-        .time { font-size: 13px; font-family: monospace; color: #aaa; }
+        .buttons-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        button, select { background: #333; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="inputWrapper">
-        <input type="text" id="videoUrl" placeholder="Video link yahan paste karein...">
-        <button class="load-btn" onclick="loadVideo()">Play Now</button>
+        <input type="text" id="videoUrl" placeholder="Video link yahan dalein...">
+        <button class="btn play-btn" onclick="manualLoad()">Play Video</button>
+        <button class="btn copy-btn" id="shareBtn" onclick="copyShareLink()">🔗 Copy Shareable Player Link</button>
     </div>
 
     <div id="playerContainer" class="player-wrapper">
-        <video id="mainVid" playsinline></video>
-
+        <video id="mainVid" playsinline controls></video>
         <div class="controls">
-            <input type="range" id="seek" value="0" min="0" max="100" step="0.1">
-            
             <div class="buttons-row">
-                <div class="btn-group">
-                    <button onclick="toggleP()">Play/Pause</button>
-                    <button onclick="skip(-10)">-10s</button>
-                    <button onclick="skip(10)">+10s</button>
-                </div>
-
-                <div class="time" id="timer">00:00 / 00:00</div>
-
-                <div class="btn-group">
-                    <select id="speed" onchange="mainVid.playbackRate=this.value">
-                        <option value="1">1x Speed</option>
-                        <option value="1.5">1.5x</option>
-                        <option value="2">2x</option>
-                    </select>
-                    <button onclick="fullSc()">Full</button>
-                </div>
+                <select onchange="mainVid.playbackRate=this.value">
+                    <option value="1">1x Speed</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x</option>
+                </select>
+                <button onclick="location.reload()">New Link</button>
             </div>
         </div>
-        <div style="text-align:center; padding: 5px; font-size: 10px; color: #444;">Refresh to change link</div>
     </div>
 
 <script>
     const mainVid = document.getElementById('mainVid');
-    const seek = document.getElementById('seek');
-    const timer = document.getElementById('timer');
     const inputWrapper = document.getElementById('inputWrapper');
     const playerContainer = document.getElementById('playerContainer');
+    const shareBtn = document.getElementById('shareBtn');
 
-    function loadVideo() {
+    // 1. Check if URL has an encrypted video link on load
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const encodedUrl = urlParams.get('v');
+        
+        if(encodedUrl) {
+            try {
+                const decodedUrl = atob(encodedUrl); // Decrypting link
+                startPlayer(decodedUrl);
+            } catch(e) {
+                console.error("Invalid Link");
+            }
+        }
+    };
+
+    function manualLoad() {
         const url = document.getElementById('videoUrl').value.trim();
         if(url) {
-            mainVid.src = url;
-            mainVid.play();
-            
-            // Hide Input and Show Player
-            inputWrapper.style.display = 'none';
-            playerContainer.style.display = 'block';
-        } else {
-            alert("Bhai link toh dalo!");
+            startPlayer(url);
+            shareBtn.style.display = 'block'; // Show copy button
         }
     }
 
-    function toggleP() { mainVid.paused ? mainVid.play() : mainVid.pause(); }
-    function skip(val) { mainVid.currentTime += val; }
-    
-    function fullSc() {
-        if (mainVid.requestFullscreen) mainVid.requestFullscreen();
-        else if (mainVid.webkitEnterFullscreen) mainVid.webkitEnterFullscreen();
+    function startPlayer(url) {
+        mainVid.src = url;
+        inputWrapper.style.display = 'none';
+        playerContainer.style.display = 'block';
+        mainVid.play();
     }
 
-    function formatT(s) {
-        let m = Math.floor(s / 60);
-        s = Math.floor(s % 60);
-        return (m < 10 ? '0' : '') + m + ":" + (s < 10 ? '0' : '') + s;
+    // 2. Encrypt and Create Shareable Link
+    function copyShareLink() {
+        const url = document.getElementById('videoUrl').value.trim();
+        if(url) {
+            const encrypted = btoa(url);
+            const shareablePath = window.location.origin + window.location.pathname + "?v=" + encrypted;
+            
+            navigator.clipboard.writeText(shareablePath).then(() => {
+                alert("Shareable Link Copied! Ab aap ise bhej sakte hain.");
+            });
+        }
     }
-
-    mainVid.ontimeupdate = () => {
-        seek.value = (mainVid.currentTime / mainVid.duration) * 100 || 0;
-        timer.innerText = formatT(mainVid.currentTime) + " / " + formatT(mainVid.duration || 0);
-    };
-
-    seek.oninput = () => {
-        mainVid.currentTime = (seek.value / 100) * mainVid.duration;
-    };
 </script>
 
 </body>
