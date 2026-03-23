@@ -1,186 +1,147 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
-<meta charset="UTF-8">
-<title>🕷️ Spider Player</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spider Secure Player</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            margin: 0; background: #000; color: #fff; 
+            font-family: 'Segoe UI', sans-serif; 
+            display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; 
+            min-height: 100vh; padding: 15px;
+        }
+        
+        /* Input Section */
+        #inputWrapper {
+            width: 100%; max-width: 500px; margin-bottom: 20px;
+            transition: 0.5s;
+        }
+        input[type="text"] {
+            width: 100%; padding: 15px; border-radius: 10px;
+            border: 2px solid #333; background: #1a1a1a; color: white;
+            outline: none; font-size: 16px; margin-bottom: 10px;
+        }
+        .load-btn {
+            width: 100%; background: #ff0000; color: white; border: none;
+            padding: 12px; border-radius: 10px; font-weight: bold; 
+            font-size: 16px; cursor: pointer;
+        }
 
-<style>
-body {
-  margin: 0;
-  background: black;
-  font-family: Arial;
-}
+        /* Player Design */
+        .player-wrapper {
+            width: 100%; max-width: 800px; background: #111;
+            border-radius: 15px; overflow: hidden; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.9);
+            display: none; /* Pehle hide rahega jab tak link na dale */
+        }
+        video { width: 100%; aspect-ratio: 16/9; background: #000; display: block; }
 
-.container {
-  max-width: 900px;
-  margin: auto;
-  padding: 10px;
-  color: white;
-}
+        .controls { padding: 15px; background: #1a1a1a; }
+        
+        /* Modern Seek Bar */
+        input[type="range"] { 
+            width: 100%; height: 6px; accent-color: #ff0000; 
+            cursor: pointer; margin-bottom: 15px;
+        }
 
-.player-box {
-  position: relative;
-}
+        .buttons-row { 
+            display: flex; justify-content: space-between; 
+            align-items: center; flex-wrap: wrap; gap: 10px;
+        }
+        
+        .btn-group { display: flex; gap: 8px; }
+        
+        button, select { 
+            background: #333; color: white; border: none; 
+            padding: 10px 15px; border-radius: 8px; 
+            font-size: 14px; cursor: pointer; font-weight: 600;
+        }
+        button:active { background: #444; transform: scale(0.95); }
 
-video {
-  width: 100%;
-  background: black;
-}
-
-/* touch zones */
-.zone {
-  position: absolute;
-  top: 0;
-  width: 50%;
-  height: 100%;
-}
-
-.left { left: 0; }
-.right { right: 0; }
-
-/* overlay animation */
-.overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 40px;
-  opacity: 0;
-  transition: 0.3s;
-}
-
-/* controls */
-.controls {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-button, select {
-  padding: 8px;
-  border-radius: 6px;
-  border: none;
-}
-
-input {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 10px;
-}
-</style>
+        .time { font-size: 13px; font-family: monospace; color: #aaa; }
+    </style>
 </head>
-
 <body>
 
-<div class="container">
+    <div id="inputWrapper">
+        <input type="text" id="videoUrl" placeholder="Video link yahan paste karein...">
+        <button class="load-btn" onclick="loadVideo()">Play Now</button>
+    </div>
 
-<h3>🕷️ Spider Player</h3>
+    <div id="playerContainer" class="player-wrapper">
+        <video id="mainVid" playsinline></video>
 
-<input type="text" id="videoUrl" placeholder="Paste video link">
+        <div class="controls">
+            <input type="range" id="seek" value="0" min="0" max="100" step="0.1">
+            
+            <div class="buttons-row">
+                <div class="btn-group">
+                    <button onclick="toggleP()">Play/Pause</button>
+                    <button onclick="skip(-10)">-10s</button>
+                    <button onclick="skip(10)">+10s</button>
+                </div>
 
-<div class="player-box">
-  <video id="player" controls controlsList="nodownload"></video>
+                <div class="time" id="timer">00:00 / 00:00</div>
 
-  <div class="zone left" ontouchend="tap('left')"></div>
-  <div class="zone right" ontouchend="tap('right')"></div>
-
-  <div id="overlay" class="overlay">⏩</div>
-</div>
-
-<div class="controls">
-  <button onclick="playVideo()">▶ Play</button>
-  <button onclick="fullscreen()">⛶ Full</button>
-  <button onclick="share()">🔗 Share</button>
-
-  <select onchange="setSpeed(this.value)">
-    <option value="0.5">0.5x</option>
-    <option value="1" selected>1x</option>
-    <option value="1.5">1.5x</option>
-    <option value="2">2x</option>
-  </select>
-</div>
-
-</div>
+                <div class="btn-group">
+                    <select id="speed" onchange="mainVid.playbackRate=this.value">
+                        <option value="1">1x Speed</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                    </select>
+                    <button onclick="fullSc()">Full</button>
+                </div>
+            </div>
+        </div>
+        <div style="text-align:center; padding: 5px; font-size: 10px; color: #444;">Refresh to change link</div>
+    </div>
 
 <script>
+    const mainVid = document.getElementById('mainVid');
+    const seek = document.getElementById('seek');
+    const timer = document.getElementById('timer');
+    const inputWrapper = document.getElementById('inputWrapper');
+    const playerContainer = document.getElementById('playerContainer');
 
-let lastTap = 0;
-
-// ▶ play
-function playVideo() {
-  let url = document.getElementById("videoUrl").value;
-  let player = document.getElementById("player");
-
-  player.src = url;
-  player.play();
-
-  window.history.replaceState(null, null, "?video=" + encodeURIComponent(url));
-}
-
-// double tap
-function tap(side) {
-  let now = new Date().getTime();
-  let diff = now - lastTap;
-
-  if (diff < 300 && diff > 0) {
-    let player = document.getElementById("player");
-    let overlay = document.getElementById("overlay");
-
-    if (side === "left") {
-      player.currentTime -= 10;
-      overlay.innerText = "⏪";
-    } else {
-      player.currentTime += 10;
-      overlay.innerText = "⏩";
+    function loadVideo() {
+        const url = document.getElementById('videoUrl').value.trim();
+        if(url) {
+            mainVid.src = url;
+            mainVid.play();
+            
+            // Hide Input and Show Player
+            inputWrapper.style.display = 'none';
+            playerContainer.style.display = 'block';
+        } else {
+            alert("Bhai link toh dalo!");
+        }
     }
 
-    overlay.style.opacity = 1;
+    function toggleP() { mainVid.paused ? mainVid.play() : mainVid.pause(); }
+    function skip(val) { mainVid.currentTime += val; }
+    
+    function fullSc() {
+        if (mainVid.requestFullscreen) mainVid.requestFullscreen();
+        else if (mainVid.webkitEnterFullscreen) mainVid.webkitEnterFullscreen();
+    }
 
-    setTimeout(() => {
-      overlay.style.opacity = 0;
-    }, 300);
-  }
+    function formatT(s) {
+        let m = Math.floor(s / 60);
+        s = Math.floor(s % 60);
+        return (m < 10 ? '0' : '') + m + ":" + (s < 10 ? '0' : '') + s;
+    }
 
-  lastTap = now;
-}
+    mainVid.ontimeupdate = () => {
+        seek.value = (mainVid.currentTime / mainVid.duration) * 100 || 0;
+        timer.innerText = formatT(mainVid.currentTime) + " / " + formatT(mainVid.duration || 0);
+    };
 
-// speed
-function setSpeed(speed) {
-  document.getElementById("player").playbackRate = speed;
-}
-
-// fullscreen
-function fullscreen() {
-  let v = document.getElementById("player");
-
-  if (!document.fullscreenElement) {
-    v.requestFullscreen();
-  } else {
-    document.exitFullscreen();
-  }
-}
-
-// share
-function share() {
-  navigator.clipboard.writeText(window.location.href);
-  alert("Link copied 🔥");
-}
-
-// auto load
-window.onload = function() {
-  let p = new URLSearchParams(window.location.search);
-  let v = p.get("video");
-
-  if (v) {
-    document.getElementById("videoUrl").value = v;
-    document.getElementById("player").src = v;
-  }
-}
-
-// disable right click
-document.addEventListener("contextmenu", e => e.preventDefault());
-
+    seek.oninput = () => {
+        mainVid.currentTime = (seek.value / 100) * mainVid.duration;
+    };
 </script>
 
 </body>
