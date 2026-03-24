@@ -3,39 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Master Player</title>
+    <title>Spider Smooth Player</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-        .container { width: 100%; max-width: 900px; padding: 20px; }
-        #inputArea { background: #111; padding: 20px; border-radius: 12px; margin-bottom: 20px; width: 100%; }
-        input { width: 100%; padding: 15px; background: #222; border: 1px solid #333; color: #fff; border-radius: 8px; margin-bottom: 10px; }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .play-btn { background: #ff0000; color: white; }
-        
-        /* Plyr Custom Theme */
-        :root { --plyr-color-main: #ff0000; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .container { width: 100%; max-width: 900px; padding: 15px; }
+        #inputArea { background: #111; padding: 25px; border-radius: 15px; text-align: center; }
+        input { width: 100%; padding: 15px; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; margin-bottom: 15px; outline: none; }
+        .play-btn { width: 100%; padding: 14px; background: #ff0000; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
         .player-wrapper { display: none; width: 100%; border-radius: 12px; overflow: hidden; }
+        :root { --plyr-color-main: #ff0000; }
+        .share-btn { width: 100%; margin-top: 20px; background: #007bff; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div id="inputArea">
-        <h2 style="text-align: center;">Spider Quality Selector</h2>
-        <input type="text" id="linkInput" placeholder="Paste your master.m3u8 link here...">
-        <button class="btn play-btn" onclick="initPlayer()">Play with Quality Options</button>
+        <h2 style="margin-bottom: 20px;">Spider Official</h2>
+        <input type="text" id="linkInput" placeholder="Paste Video / M3U8 Link...">
+        <button class="play-btn" onclick="initPlayer()">Play Smoothly</button>
     </div>
 
     <div id="playerWrapper" class="player-wrapper">
         <video id="videoPlayer" playsinline controls crossorigin="anonymous"></video>
-        <div style="margin-top: 15px; display: flex; gap: 10px;">
-            <button class="btn" style="background:#007bff; color:white;" onclick="copyLink()">Copy Encrypted Link</button>
-            <button class="btn" style="background:#333; color:white;" onclick="location.reload()">New Video</button>
-        </div>
+        <button id="copyBtn" class="share-btn" onclick="copyLink()">🔗 Copy Encrypted Share Link</button>
     </div>
 </div>
 
@@ -46,60 +41,72 @@
 
     function initPlayer() {
         const url = document.getElementById('linkInput').value.trim();
-        if(!url) return alert("Link toh dalo!");
+        if(!url) return alert("Link dalo bhai!");
 
         document.getElementById('inputArea').style.display = 'none';
         document.getElementById('playerWrapper').style.display = 'block';
 
         const video = document.getElementById('videoPlayer');
 
-        if (Hls.isSupported()) {
-            hls = new Hls({
-                // Yeh settings buffers aur quality switch ko smooth banati hain
-                enableWorker: true,
-                lowLatencyMode: true,
-            });
-            hls.loadSource(url);
-            hls.attachMedia(video);
-            
-            hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                // Available qualities nikalna (e.g. 720, 480, 360)
-                const availableQualities = hls.levels.map((l) => l.height);
-                availableQualities.unshift(0); // 'Auto' option ke liye
-
-                player = new Plyr(video, {
-                    settings: ['quality', 'speed'],
-                    quality: {
-                        default: 0,
-                        options: availableQualities,
-                        forced: true,
-                        onChange: (q) => {
-                            if (q === 0) {
-                                hls.currentLevel = -1; // Auto quality
-                            } else {
-                                hls.levels.forEach((level, index) => {
-                                    if (level.height === q) hls.currentLevel = index;
-                                });
-                            }
-                        },
-                    },
-                    i18n: { quality: 'Quality', speed: 'Speed' },
-                    speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+        if (url.includes('.m3u8')) {
+            if (Hls.isSupported()) {
+                // Buffering Fix Settings
+                hls = new Hls({
+                    maxBufferLength: 30,        // Buffer 30 seconds ahead
+                    maxMaxBufferLength: 60,     
+                    enableWorker: true,         // Performance boost
+                    lowLatencyMode: true,       
+                    backBufferLength: 30        // Keeps previous video in memory
                 });
-            });
-        } 
-        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Safari native support
+                
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    setupPlyr(video, hls.levels.map(l => l.height));
+                });
+
+                // Error handling to prevent freezing
+                hls.on(Hls.Events.ERROR, function (event, data) {
+                    if (data.fatal) {
+                        switch (data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR: hls.startLoad(); break;
+                            case Hls.ErrorTypes.MEDIA_ERROR: hls.recoverMediaError(); break;
+                            default: hls.destroy(); break;
+                        }
+                    }
+                });
+            }
+        } else {
             video.src = url;
-            player = new Plyr(video);
+            setupPlyr(video, []);
         }
+    }
+
+    function setupPlyr(video, qualities) {
+        player = new Plyr(video, {
+            settings: ['quality', 'speed'],
+            quality: {
+                default: 0,
+                options: [0, ...qualities],
+                forced: true,
+                onChange: (q) => {
+                    if (hls) {
+                        if (q === 0) hls.currentLevel = -1;
+                        else hls.currentLevel = qualities.indexOf(q);
+                    }
+                }
+            },
+            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+        });
+        video.play();
     }
 
     function copyLink() {
         const url = document.getElementById('linkInput').value.trim();
-        const encrypted = btoa(url);
-        const shareURL = window.location.origin + window.location.pathname + "?v=" + encrypted;
-        navigator.clipboard.writeText(shareURL).then(() => alert("Encrypted Link Copied!"));
+        const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(url);
+        navigator.clipboard.writeText(shareURL).then(() => {
+            alert("Copied!");
+        });
     }
 
     window.onload = function() {
