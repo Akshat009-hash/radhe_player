@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Smooth Player</title>
+    <title>Spider Error-Free Player</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
         .container { width: 100%; max-width: 900px; padding: 15px; }
         #inputArea { background: #111; padding: 25px; border-radius: 15px; text-align: center; }
-        input { width: 100%; padding: 15px; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; margin-bottom: 15px; outline: none; }
+        input { width: 100%; padding: 15px; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; margin-bottom: 15px; outline: none; width: -webkit-fill-available; }
         .play-btn { width: 100%; padding: 14px; background: #ff0000; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
         .player-wrapper { display: none; width: 100%; border-radius: 12px; overflow: hidden; }
         :root { --plyr-color-main: #ff0000; }
@@ -24,8 +22,8 @@
 <div class="container">
     <div id="inputArea">
         <h2 style="margin-bottom: 20px;">Spider Official</h2>
-        <input type="text" id="linkInput" placeholder="Paste Video / M3U8 Link...">
-        <button class="play-btn" onclick="initPlayer()">Play Smoothly</button>
+        <input type="text" id="linkInput" placeholder="Paste .mp4 or .m3u8 link...">
+        <button class="play-btn" onclick="initPlayer()">Play Now</button>
     </div>
 
     <div id="playerWrapper" class="player-wrapper">
@@ -34,87 +32,78 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+
 <script>
     let player;
     let hls;
 
     function initPlayer() {
         const url = document.getElementById('linkInput').value.trim();
-        if(!url) return alert("Link dalo bhai!");
+        if(!url) return alert("Link input karein!");
 
         document.getElementById('inputArea').style.display = 'none';
         document.getElementById('playerWrapper').style.display = 'block';
 
         const video = document.getElementById('videoPlayer');
+        const defaultOptions = {
+            settings: ['quality', 'speed'],
+            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+        };
 
-        if (url.includes('.m3u8')) {
-            if (Hls.isSupported()) {
-                // Buffering Fix Settings
-                hls = new Hls({
-                    maxBufferLength: 30,        // Buffer 30 seconds ahead
-                    maxMaxBufferLength: 60,     
-                    enableWorker: true,         // Performance boost
-                    lowLatencyMode: true,       
-                    backBufferLength: 30        // Keeps previous video in memory
-                });
-                
-                hls.loadSource(url);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    setupPlyr(video, hls.levels.map(l => l.height));
-                });
-
-                // Error handling to prevent freezing
-                hls.on(Hls.Events.ERROR, function (event, data) {
-                    if (data.fatal) {
-                        switch (data.type) {
-                            case Hls.ErrorTypes.NETWORK_ERROR: hls.startLoad(); break;
-                            case Hls.ErrorTypes.MEDIA_ERROR: hls.recoverMediaError(); break;
-                            default: hls.destroy(); break;
+        if (url.includes('.m3u8') && Hls.isSupported()) {
+            hls = new Hls({
+                maxBufferLength: 30,
+                enableWorker: true
+            });
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                const qualities = hls.levels.map(l => l.height);
+                const plyrOptions = {
+                    ...defaultOptions,
+                    quality: {
+                        default: 0,
+                        options: [0, ...qualities],
+                        forced: true,
+                        onChange: (q) => {
+                            if (q === 0) hls.currentLevel = -1;
+                            else {
+                                const index = qualities.indexOf(q);
+                                hls.currentLevel = index;
+                            }
                         }
                     }
-                });
-            }
+                };
+                player = new Plyr(video, plyrOptions);
+            });
         } else {
+            // Standard MP4 or Safari HLS
             video.src = url;
-            setupPlyr(video, []);
+            player = new Plyr(video, defaultOptions);
         }
-    }
-
-    function setupPlyr(video, qualities) {
-        player = new Plyr(video, {
-            settings: ['quality', 'speed'],
-            quality: {
-                default: 0,
-                options: [0, ...qualities],
-                forced: true,
-                onChange: (q) => {
-                    if (hls) {
-                        if (q === 0) hls.currentLevel = -1;
-                        else hls.currentLevel = qualities.indexOf(q);
-                    }
-                }
-            },
-            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
-        });
-        video.play();
     }
 
     function copyLink() {
         const url = document.getElementById('linkInput').value.trim();
-        const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(url);
+        const encrypted = btoa(url);
+        const shareURL = window.location.origin + window.location.pathname + "?v=" + encrypted;
         navigator.clipboard.writeText(shareURL).then(() => {
-            alert("Copied!");
+            alert("Shareable Link Copied!");
         });
     }
 
+    // Handle Share Links
     window.onload = function() {
         const params = new URLSearchParams(window.location.search);
         const v = params.get('v');
         if(v) {
-            document.getElementById('linkInput').value = atob(v);
-            initPlayer();
+            try {
+                document.getElementById('linkInput').value = atob(v);
+                initPlayer();
+            } catch(e) { console.error("Invalid Link"); }
         }
     }
 </script>
