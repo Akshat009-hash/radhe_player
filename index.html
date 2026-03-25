@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Pro Secure</title>
+    <title>Spider Pro Player</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     
     <style>
         :root { --plyr-color-main: #ff0000; }
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow-x: hidden; }
         .container { width: 100%; max-width: 900px; padding: 15px; }
         
         #inputArea { background: #111; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #222; }
@@ -18,12 +18,6 @@
         .play-btn { width: 100%; padding: 15px; background: #ff0000; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
 
         .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
-        
-        /* Custom Skip Buttons in Control Bar */
-        .plyr__controls [data-plyr="rewind"], .plyr__controls [data-plyr="fast-forward"] {
-            display: flex;
-        }
-
         .share-btn { width: 100%; margin-top: 20px; background: #007bff; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
@@ -33,7 +27,7 @@
     <div id="inputArea">
         <h2 style="color: #ff0000;">SPIDER PRO</h2>
         <input type="text" id="linkInput" placeholder="Paste Lecture Link...">
-        <button class="play-btn" onclick="initPlayer()">SECURE PLAY</button>
+        <button class="play-btn" onclick="handleManualPlay()">SECURE PLAY</button>
     </div>
 
     <div id="playerWrapper" class="player-wrapper">
@@ -48,20 +42,21 @@
     let hls;
     let secureUrl = "";
 
-    function initPlayer() {
-        const inputField = document.getElementById('linkInput');
-        const url = inputField.value.trim();
+    // Function to start player
+    function startPlayer(url) {
         if(!url) return;
-
         secureUrl = url;
-        inputField.value = ""; 
+
+        // Hide input area if it exists
+        const inputArea = document.getElementById('inputArea');
+        if(inputArea) inputArea.style.display = 'none';
         
-        if(document.getElementById('inputArea')) document.getElementById('inputArea').remove();
         document.getElementById('playerWrapper').style.display = 'block';
 
         const video = document.getElementById('videoPlayer');
 
         if (url.includes('.m3u8') && Hls.isSupported()) {
+            if(hls) hls.destroy();
             hls = new Hls({ maxBufferLength: 60 });
             hls.loadSource(url);
             hls.attachMedia(video);
@@ -74,14 +69,16 @@
         }
     }
 
+    function handleManualPlay() {
+        const url = document.getElementById('linkInput').value.trim();
+        if(url) startPlayer(url);
+    }
+
     function setupPlyr(video, qualities) {
-        // Adding 'rewind' and 'fast-forward' to the controls array
+        if(player) player.destroy();
         player = new Plyr(video, {
-            controls: [
-                'play-large', 'rewind', 'play', 'fast-forward', 'progress', 
-                'current-time', 'mute', 'volume', 'settings', 'pip', 'fullscreen'
-            ],
-            seekTime: 10, // 10 seconds skip
+            controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'fullscreen'],
+            seekTime: 10,
             settings: ['quality', 'speed'],
             quality: {
                 default: 0,
@@ -97,25 +94,20 @@
             speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
         });
 
-        // Double Tap to Seek (Mobile Friendly)
+        // Double Tap Support
         video.addEventListener('touchstart', function(e) {
             let now = new Date().getTime();
             let lastTouch = video.getAttribute('data-last-touch') || 0;
-            let timeout = 300; 
-            
-            if (now - lastTouch < timeout) {
+            if (now - lastTouch < 300) {
                 let rect = video.getBoundingClientRect();
                 let x = e.touches[0].clientX - rect.left;
-                if (x < rect.width / 2) {
-                    player.rewind(10); // Left side double tap
-                } else {
-                    player.forward(10); // Right side double tap
-                }
+                if (x < rect.width / 2) player.rewind(10);
+                else player.forward(10);
             }
             video.setAttribute('data-last-touch', now);
         });
 
-        video.play();
+        video.play().catch(() => {});
     }
 
     function copyMaskedLink() {
@@ -123,19 +115,20 @@
         const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(secureUrl);
         navigator.clipboard.writeText(shareURL).then(() => {
             const btn = document.getElementById('copyBtn');
-            btn.innerText = "✅ PROTECTED LINK COPIED!";
+            btn.innerText = "✅ LINK COPIED!";
             setTimeout(() => btn.innerText = "🔗 GENERATE PROTECTED LINK", 2000);
         });
     }
 
+    // Auto-load on page load
     window.onload = function() {
         const params = new URLSearchParams(window.location.search);
         const v = params.get('v');
         if(v) {
             try {
-                secureUrl = atob(v);
-                initPlayer();
-            } catch(e) {}
+                const decodedUrl = atob(v);
+                startPlayer(decodedUrl);
+            } catch(e) { console.error("Invalid Link"); }
         }
     }
 </script>
