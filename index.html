@@ -3,110 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Error-Free Player</title>
+    <title>Spider Pro Secure</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-        .container { width: 100%; max-width: 900px; padding: 15px; }
-        #inputArea { background: #111; padding: 25px; border-radius: 15px; text-align: center; }
-        input { width: 100%; padding: 15px; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; margin-bottom: 15px; outline: none; width: -webkit-fill-available; }
-        .play-btn { width: 100%; padding: 14px; background: #ff0000; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        .player-wrapper { display: none; width: 100%; border-radius: 12px; overflow: hidden; }
         :root { --plyr-color-main: #ff0000; }
-        .share-btn { width: 100%; margin-top: 20px; background: #007bff; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+        .container { width: 100%; max-width: 900px; padding: 15px; }
+        
+        #inputArea { background: #111; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #222; }
+        input { width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 15px; outline: none; box-sizing: border-box; }
+        .play-btn { width: 100%; padding: 15px; background: #ff0000; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
+
+        .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
+        
+        /* Custom Skip Buttons in Control Bar */
+        .plyr__controls [data-plyr="rewind"], .plyr__controls [data-plyr="fast-forward"] {
+            display: flex;
+        }
+
+        .share-btn { width: 100%; margin-top: 20px; background: #007bff; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
 
 <div class="container">
     <div id="inputArea">
-        <h2 style="margin-bottom: 20px;">Spider Official</h2>
-        <input type="text" id="linkInput" placeholder="Paste .mp4 or .m3u8 link...">
-        <button class="play-btn" onclick="initPlayer()">Play Now</button>
+        <h2 style="color: #ff0000;">SPIDER PRO</h2>
+        <input type="text" id="linkInput" placeholder="Paste Lecture Link...">
+        <button class="play-btn" onclick="initPlayer()">SECURE PLAY</button>
     </div>
 
     <div id="playerWrapper" class="player-wrapper">
         <video id="videoPlayer" playsinline controls crossorigin="anonymous"></video>
-        <button id="copyBtn" class="share-btn" onclick="copyLink()">🔗 Copy Encrypted Share Link</button>
+        <button id="copyBtn" class="share-btn" onclick="copyMaskedLink()">🔗 GENERATE PROTECTED LINK</button>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
-
 <script>
     let player;
     let hls;
+    let secureUrl = "";
 
     function initPlayer() {
-        const url = document.getElementById('linkInput').value.trim();
-        if(!url) return alert("Link input karein!");
+        const inputField = document.getElementById('linkInput');
+        const url = inputField.value.trim();
+        if(!url) return;
 
-        document.getElementById('inputArea').style.display = 'none';
+        secureUrl = url;
+        inputField.value = ""; 
+        
+        if(document.getElementById('inputArea')) document.getElementById('inputArea').remove();
         document.getElementById('playerWrapper').style.display = 'block';
 
         const video = document.getElementById('videoPlayer');
-        const defaultOptions = {
-            settings: ['quality', 'speed'],
-            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
-        };
 
         if (url.includes('.m3u8') && Hls.isSupported()) {
-            hls = new Hls({
-                maxBufferLength: 30,
-                enableWorker: true
-            });
+            hls = new Hls({ maxBufferLength: 60 });
             hls.loadSource(url);
             hls.attachMedia(video);
-            
-            hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                const qualities = hls.levels.map(l => l.height);
-                const plyrOptions = {
-                    ...defaultOptions,
-                    quality: {
-                        default: 0,
-                        options: [0, ...qualities],
-                        forced: true,
-                        onChange: (q) => {
-                            if (q === 0) hls.currentLevel = -1;
-                            else {
-                                const index = qualities.indexOf(q);
-                                hls.currentLevel = index;
-                            }
-                        }
-                    }
-                };
-                player = new Plyr(video, plyrOptions);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                setupPlyr(video, hls.levels.map(l => l.height));
             });
         } else {
-            // Standard MP4 or Safari HLS
             video.src = url;
-            player = new Plyr(video, defaultOptions);
+            setupPlyr(video, []);
         }
     }
 
-    function copyLink() {
-        const url = document.getElementById('linkInput').value.trim();
-        const encrypted = btoa(url);
-        const shareURL = window.location.origin + window.location.pathname + "?v=" + encrypted;
+    function setupPlyr(video, qualities) {
+        // Adding 'rewind' and 'fast-forward' to the controls array
+        player = new Plyr(video, {
+            controls: [
+                'play-large', 'rewind', 'play', 'fast-forward', 'progress', 
+                'current-time', 'mute', 'volume', 'settings', 'pip', 'fullscreen'
+            ],
+            seekTime: 10, // 10 seconds skip
+            settings: ['quality', 'speed'],
+            quality: {
+                default: 0,
+                options: [0, ...qualities],
+                forced: true,
+                onChange: (q) => {
+                    if (hls) {
+                        if (q === 0) hls.currentLevel = -1;
+                        else hls.currentLevel = qualities.indexOf(q);
+                    }
+                }
+            },
+            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+        });
+
+        // Double Tap to Seek (Mobile Friendly)
+        video.addEventListener('touchstart', function(e) {
+            let now = new Date().getTime();
+            let lastTouch = video.getAttribute('data-last-touch') || 0;
+            let timeout = 300; 
+            
+            if (now - lastTouch < timeout) {
+                let rect = video.getBoundingClientRect();
+                let x = e.touches[0].clientX - rect.left;
+                if (x < rect.width / 2) {
+                    player.rewind(10); // Left side double tap
+                } else {
+                    player.forward(10); // Right side double tap
+                }
+            }
+            video.setAttribute('data-last-touch', now);
+        });
+
+        video.play();
+    }
+
+    function copyMaskedLink() {
+        if(!secureUrl) return;
+        const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(secureUrl);
         navigator.clipboard.writeText(shareURL).then(() => {
-            alert("Shareable Link Copied!");
+            const btn = document.getElementById('copyBtn');
+            btn.innerText = "✅ PROTECTED LINK COPIED!";
+            setTimeout(() => btn.innerText = "🔗 GENERATE PROTECTED LINK", 2000);
         });
     }
 
-    // Handle Share Links
     window.onload = function() {
         const params = new URLSearchParams(window.location.search);
         const v = params.get('v');
         if(v) {
             try {
-                document.getElementById('linkInput').value = atob(v);
+                secureUrl = atob(v);
                 initPlayer();
-            } catch(e) { console.error("Invalid Link"); }
+            } catch(e) {}
         }
     }
 </script>
-
 </body>
 </html>
