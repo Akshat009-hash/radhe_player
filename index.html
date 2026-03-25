@@ -3,20 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Pro Player</title>
+    <title>Spider PLAYER</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     
     <style>
         :root { --plyr-color-main: #ff0000; }
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow-x: hidden; }
+        body { 
+            margin: 0; background: #000; color: #fff; font-family: sans-serif; 
+            display: flex; align-items: center; justify-content: center; 
+            min-height: 100vh; overflow: hidden;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+        }
         .container { width: 100%; max-width: 900px; padding: 15px; }
-        
         #inputArea { background: #111; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #222; }
         input { width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 15px; outline: none; box-sizing: border-box; }
         .play-btn { width: 100%; padding: 15px; background: #ff0000; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
-
         .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
         .share-btn { width: 100%; margin-top: 20px; background: #007bff; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; }
     </style>
@@ -25,44 +28,62 @@
 
 <div class="container">
     <div id="inputArea">
-        <h2 style="color: #ff0000;">SPIDER PRO</h2>
-        <input type="text" id="linkInput" placeholder="Paste Lecture Link...">
+        <h2 style="color: #ff0000;">SPIDER SECURE PRO</h2>
+        <input type="text" id="linkInput" placeholder="Paste Secret Link...">
         <button class="play-btn" onclick="handleManualPlay()">SECURE PLAY</button>
     </div>
 
     <div id="playerWrapper" class="player-wrapper">
         <video id="videoPlayer" playsinline controls crossorigin="anonymous"></video>
-        <button id="copyBtn" class="share-btn" onclick="copyMaskedLink()">🔗 GENERATE PROTECTED LINK</button>
+        <button id="copyBtn" class="share-btn" onclick="copyMaskedLink()">🔗 PROTECT & COPY LINK</button>
     </div>
 </div>
 
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <script>
+    // --- ANTI-HACK SECURITY LAYER ---
+    
+    // 1. Block Keyboard Shortcuts (F12, Ctrl+U, Ctrl+Shift+I)
+    document.onkeydown = function(e) {
+        if(e.keyCode == 123) return false; 
+        if(e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0))) return false;
+        if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+    };
+
+    // 2. Continuous Console Clear (Hides logs)
+    setInterval(() => { console.clear(); }, 500);
+
+    // 3. Debugger Trap (Freezes page if DevTools is opened)
+    (function() {
+        var devtools = function() {};
+        devtools.toString = function() {
+            eval("debugger;");
+            return '';
+        };
+        console.log('%c', devtools);
+    }());
+
+    // --- PLAYER LOGIC ---
+
     let player;
     let hls;
     let secureUrl = "";
 
-    // Function to start player
     function startPlayer(url) {
         if(!url) return;
         secureUrl = url;
-
-        // Hide input area if it exists
         const inputArea = document.getElementById('inputArea');
         if(inputArea) inputArea.style.display = 'none';
-        
         document.getElementById('playerWrapper').style.display = 'block';
 
         const video = document.getElementById('videoPlayer');
 
         if (url.includes('.m3u8') && Hls.isSupported()) {
             if(hls) hls.destroy();
-            hls = new Hls({ maxBufferLength: 60 });
+            hls = new Hls({ maxBufferLength: 60, lowLatencyMode: true });
             hls.loadSource(url);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                setupPlyr(video, hls.levels.map(l => l.height));
-            });
+            hls.on(Hls.Events.MANIFEST_PARSED, () => setupPlyr(video, hls.levels.map(l => l.height)));
         } else {
             video.src = url;
             setupPlyr(video, []);
@@ -91,10 +112,10 @@
                     }
                 }
             },
-            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+            speed: { selected: 1, options: [0.5, 1, 1.25, 1.5, 2] }
         });
 
-        // Double Tap Support
+        // Double Tap to Seek
         video.addEventListener('touchstart', function(e) {
             let now = new Date().getTime();
             let lastTouch = video.getAttribute('data-last-touch') || 0;
@@ -106,7 +127,6 @@
             }
             video.setAttribute('data-last-touch', now);
         });
-
         video.play().catch(() => {});
     }
 
@@ -115,20 +135,16 @@
         const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(secureUrl);
         navigator.clipboard.writeText(shareURL).then(() => {
             const btn = document.getElementById('copyBtn');
-            btn.innerText = "✅ LINK COPIED!";
-            setTimeout(() => btn.innerText = "🔗 GENERATE PROTECTED LINK", 2000);
+            btn.innerText = "✅ PROTECTED & COPIED!";
+            setTimeout(() => btn.innerText = "🔗 PROTECT & COPY LINK", 2000);
         });
     }
 
-    // Auto-load on page load
     window.onload = function() {
         const params = new URLSearchParams(window.location.search);
         const v = params.get('v');
         if(v) {
-            try {
-                const decodedUrl = atob(v);
-                startPlayer(decodedUrl);
-            } catch(e) { console.error("Invalid Link"); }
+            try { startPlayer(atob(v)); } catch(e) {}
         }
     }
 </script>
