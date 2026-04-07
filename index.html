@@ -2,8 +2,8 @@
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider PLAYER</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spider PLAYER PRO</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -20,7 +20,11 @@
         #inputArea { background: #111; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #222; }
         input { width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 15px; outline: none; box-sizing: border-box; }
         .play-btn { width: 100%; padding: 15px; background: #ff0000; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
-        .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
+        
+        /* Full screen fixes */
+        .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; position: relative; }
+        .plyr--fullscreen-fallback { height: 100vh !important; width: 100vw !important; }
+        
         .share-btn { width: 100%; margin-top: 20px; background: #007bff; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
@@ -29,7 +33,7 @@
 <div class="container">
     <div id="inputArea">
         <h2 style="color: #ff0000;">SPIDER SECURE PRO</h2>
-        <input type="text" id="linkInput" placeholder="Paste Secret Link...">
+        <input type="text" id="linkInput" placeholder="Paste Secret Link (m3u8 or mp4)...">
         <button class="play-btn" onclick="handleManualPlay()">SECURE PLAY</button>
     </div>
 
@@ -41,29 +45,11 @@
 
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <script>
-    // --- ANTI-HACK SECURITY LAYER ---
-    
-    // 1. Block Keyboard Shortcuts (F12, Ctrl+U, Ctrl+Shift+I)
-    document.onkeydown = function(e) {
-        if(e.keyCode == 123) return false; 
-        if(e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0))) return false;
-        if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+    // --- SECURITY LAYER ---
+    document.onkeydown = (e) => {
+        if(e.keyCode == 123 || (e.ctrlKey && e.shiftKey && [73, 67, 74].includes(e.keyCode)) || (e.ctrlKey && e.keyCode == 85)) return false;
     };
-
-    // 2. Continuous Console Clear (Hides logs)
     setInterval(() => { console.clear(); }, 500);
-
-    // 3. Debugger Trap (Freezes page if DevTools is opened)
-    (function() {
-        var devtools = function() {};
-        devtools.toString = function() {
-            eval("debugger;");
-            return '';
-        };
-        console.log('%c', devtools);
-    }());
-
-    // --- PLAYER LOGIC ---
 
     let player;
     let hls;
@@ -72,8 +58,7 @@
     function startPlayer(url) {
         if(!url) return;
         secureUrl = url;
-        const inputArea = document.getElementById('inputArea');
-        if(inputArea) inputArea.style.display = 'none';
+        document.getElementById('inputArea').style.display = 'none';
         document.getElementById('playerWrapper').style.display = 'block';
 
         const video = document.getElementById('videoPlayer');
@@ -99,20 +84,26 @@
         if(player) player.destroy();
         player = new Plyr(video, {
             controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'fullscreen'],
-            seekTime: 10,
             settings: ['quality', 'speed'],
             quality: {
                 default: 0,
                 options: [0, ...qualities],
                 forced: true,
-                onChange: (q) => {
-                    if (hls) {
-                        if (q === 0) hls.currentLevel = -1;
-                        else hls.currentLevel = qualities.indexOf(q);
-                    }
-                }
-            },
-            speed: { selected: 1, options: [0.5, 1, 1.25, 1.5, 2] }
+                onChange: (q) => { if (hls) hls.currentLevel = q === 0 ? -1 : qualities.indexOf(q); }
+            }
+        });
+
+        // --- AUTO ROTATE & FULLSCREEN LOGIC ---
+        player.on('enterfullscreen', () => {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {}); 
+            }
+        });
+
+        player.on('exitfullscreen', () => {
+            if (screen.orientation && screen.orientation.unlock) {
+                screen.orientation.unlock().catch(() => {});
+            }
         });
 
         // Double Tap to Seek
@@ -127,6 +118,7 @@
             }
             video.setAttribute('data-last-touch', now);
         });
+
         video.play().catch(() => {});
     }
 
@@ -143,9 +135,7 @@
     window.onload = function() {
         const params = new URLSearchParams(window.location.search);
         const v = params.get('v');
-        if(v) {
-            try { startPlayer(atob(v)); } catch(e) {}
-        }
+        if(v) { try { startPlayer(atob(v)); } catch(e) {} }
     }
 </script>
 </body>
