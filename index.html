@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spider PLAYER </title>
+    <title>Spider PLAYER FINAL</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -17,22 +17,26 @@
         }
         .container { width: 100%; max-width: 900px; padding: 15px; }
         #inputArea { background: #111; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #222; }
-        input { width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 15px; width: 100%; box-sizing: border-box; }
+        input { width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 15px; width: 100%; box-sizing: border-box; outline: none; }
         .play-btn { width: 100%; padding: 15px; background: #ff0000; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
-        .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
+        
+        .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; position: relative; }
+        .share-btn { width: 100%; margin-top: 15px; background: #222; color: #007bff; border: 1px solid #007bff; padding: 12px; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .share-btn:hover { background: #007bff; color: #fff; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div id="inputArea">
-        <h2 style="color: #ff0000;">SPIDER START-FIX</h2>
-        <input type="text" id="linkInput" placeholder="Paste Link Here...">
+        <h2 style="color: #ff0000;">SPIDER SECURE</h2>
+        <input type="text" id="linkInput" placeholder="Paste Video/Live Link...">
         <button class="play-btn" onclick="handleManualPlay()">START FROM BEGINNING</button>
     </div>
 
     <div id="playerWrapper" class="player-wrapper">
-        <video id="videoPlayer" playsinline controls></video>
+        <video id="videoPlayer" playsinline controls crossorigin="anonymous"></video>
+        <button id="copyBtn" class="share-btn" onclick="copyMaskedLink()">🔗 PROTECT & COPY SHARE LINK</button>
     </div>
 </div>
 
@@ -40,9 +44,11 @@
 <script>
     let player;
     let hls;
+    let secureUrl = "";
 
     function startPlayer(url) {
         if(!url) return;
+        secureUrl = url;
         document.getElementById('inputArea').style.display = 'none';
         document.getElementById('playerWrapper').style.display = 'block';
 
@@ -53,26 +59,24 @@
             
             hls = new Hls({
                 enableWorker: true,
-                // --- FORCE START FROM BEGINNING ---
-                startPosition: 0,            // Ye video ko 0:00 se start karega
-                liveSyncDuration: 30,        // Buffering rokne ke liye 30 sec ka buffer backup
-                backBufferLength: Infinity,  // Jitna piche jana chaho ja sakte ho
-                maxBufferLength: 60
+                startPosition: 0,            // Shuruat se chalega
+                liveSyncDuration: 20,        // Buffering fix
+                backBufferLength: 900,       // 15 min tak peeche ja sakte ho
+                maxBufferLength: 40
             });
 
             hls.loadSource(url);
             hls.attachMedia(video);
-            
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 setupPlyr(video, hls.levels.map(l => l.height));
-                // Extra security: force seek to 0 after metadata loads
-                video.currentTime = 0; 
+                video.currentTime = 0; // Double check for 0 start
             });
 
-            hls.on(Hls.Events.ERROR, (e, data) => {
-                if (data.fatal) {
-                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-                    else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+            // Auto-recovery
+            hls.on(Hls.Events.ERROR, (e, d) => {
+                if (d.fatal) {
+                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+                    else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
                 }
             });
         } else {
@@ -91,16 +95,64 @@
         player = new Plyr(video, {
             controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings', 'fullscreen'],
             settings: ['quality', 'speed'],
-            invertTime: false, // Remaining time ki jagah Total time dikhayega
             seekTime: 10
         });
 
-        // Rotation lock fix
+        // Rotation lock
         player.on('enterfullscreen', () => {
             if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); 
         });
 
         video.play().catch(() => {});
+    }
+
+    // --- COPY & SHARE LOGIC ---
+    function copyMaskedLink() {
+        if(!secureUrl) return;
+        
+        // Isse link "Spider Secure" format mein convert ho jayegi
+        const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(secureUrl);
+        
+        // Modern Clipboard API
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareURL).then(() => {
+                updateBtnStatus();
+            }).catch(() => {
+                fallbackCopy(shareURL);
+            });
+        } else {
+            fallbackCopy(shareURL);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            updateBtnStatus();
+        } catch (err) {}
+        document.body.removeChild(textArea);
+    }
+
+    function updateBtnStatus() {
+        const btn = document.getElementById('copyBtn');
+        btn.innerText = "✅ LINK COPIED!";
+        btn.style.borderColor = "#28a745";
+        btn.style.color = "#28a745";
+        setTimeout(() => {
+            btn.innerText = "🔗 PROTECT & COPY SHARE LINK";
+            btn.style.borderColor = "#007bff";
+            btn.style.color = "#007bff";
+        }, 2000);
+    }
+
+    window.onload = function() {
+        const params = new URLSearchParams(window.location.search);
+        const v = params.get('v');
+        if(v) { try { startPlayer(atob(v)); } catch(e) {} }
     }
 </script>
 </body>
