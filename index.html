@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spider PLAYER LIVE</title>
+    <title>Spider PLAYER - START FROM ZERO</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -14,28 +14,25 @@
             margin: 0; background: #000; color: #fff; font-family: sans-serif; 
             display: flex; align-items: center; justify-content: center; 
             min-height: 100vh; overflow: hidden;
-            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
         }
         .container { width: 100%; max-width: 900px; padding: 15px; }
         #inputArea { background: #111; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #222; }
-        input { width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 15px; outline: none; box-sizing: border-box; }
+        input { width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 15px; width: 100%; box-sizing: border-box; }
         .play-btn { width: 100%; padding: 15px; background: #ff0000; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
-        .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; position: relative; }
-        .share-btn { width: 100%; margin-top: 20px; background: #007bff; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
 
 <div class="container">
     <div id="inputArea">
-        <h2 style="color: #ff0000;">SPIDER LIVE PRO</h2>
-        <input type="text" id="linkInput" placeholder="Paste Live Class Link...">
-        <button class="play-btn" onclick="handleManualPlay()">JOIN LIVE CLASS</button>
+        <h2 style="color: #ff0000;">SPIDER START-FIX</h2>
+        <input type="text" id="linkInput" placeholder="Paste Link Here...">
+        <button class="play-btn" onclick="handleManualPlay()">START FROM BEGINNING</button>
     </div>
 
     <div id="playerWrapper" class="player-wrapper">
-        <video id="videoPlayer" playsinline controls crossorigin="anonymous"></video>
-        <button id="copyBtn" class="share-btn" onclick="copyMaskedLink()">🔗 PROTECT & SHARE</button>
+        <video id="videoPlayer" playsinline controls></video>
     </div>
 </div>
 
@@ -43,11 +40,9 @@
 <script>
     let player;
     let hls;
-    let secureUrl = "";
 
     function startPlayer(url) {
         if(!url) return;
-        secureUrl = url;
         document.getElementById('inputArea').style.display = 'none';
         document.getElementById('playerWrapper').style.display = 'block';
 
@@ -57,23 +52,24 @@
             if(hls) hls.destroy();
             
             hls = new Hls({
-                // --- LIVE CLASS OPTIMIZATION ---
                 enableWorker: true,
-                lowLatencyMode: true,           // Live ke liye delay kam karega
-                backBufferLength: 60,           // Purana video memory mein rakhega
-                liveSyncDurationCount: 3,       // Live edge se 3 fragments peeche chalega (Buffering rokne ke liye)
-                liveMaxLatencyDurationCount: 10,
-                maxBufferLength: 20,            // 20 sec buffer karega
-                manifestLoadingMaxRetry: 5,     // Agar internet gaya toh 5 baar try karega
-                levelLoadingMaxRetry: 5
+                // --- FORCE START FROM BEGINNING ---
+                startPosition: 0,            // Ye video ko 0:00 se start karega
+                liveSyncDuration: 30,        // Buffering rokne ke liye 30 sec ka buffer backup
+                backBufferLength: Infinity,  // Jitna piche jana chaho ja sakte ho
+                maxBufferLength: 60
             });
 
             hls.loadSource(url);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => setupPlyr(video, hls.levels.map(l => l.height)));
             
-            // Auto-recovery for Live
-            hls.on(Hls.Events.ERROR, (event, data) => {
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                setupPlyr(video, hls.levels.map(l => l.height));
+                // Extra security: force seek to 0 after metadata loads
+                video.currentTime = 0; 
+            });
+
+            hls.on(Hls.Events.ERROR, (e, data) => {
                 if (data.fatal) {
                     if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
                     else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
@@ -93,42 +89,18 @@
     function setupPlyr(video, qualities) {
         if(player) player.destroy();
         player = new Plyr(video, {
-            controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
+            controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings', 'fullscreen'],
             settings: ['quality', 'speed'],
-            quality: {
-                default: 0,
-                options: [0, ...qualities],
-                forced: true,
-                onChange: (q) => { if (hls) hls.currentLevel = q === 0 ? -1 : qualities.indexOf(q); }
-            }
+            invertTime: false, // Remaining time ki jagah Total time dikhayega
+            seekTime: 10
         });
 
-        // Fullscreen Landscape Lock
+        // Rotation lock fix
         player.on('enterfullscreen', () => {
             if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); 
         });
 
-        player.on('exitfullscreen', () => {
-            if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock().catch(() => {});
-        });
-
         video.play().catch(() => {});
-    }
-
-    function copyMaskedLink() {
-        if(!secureUrl) return;
-        const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(secureUrl);
-        navigator.clipboard.writeText(shareURL).then(() => {
-            const btn = document.getElementById('copyBtn');
-            btn.innerText = "✅ COPIED!";
-            setTimeout(() => btn.innerText = "🔗 PROTECT & SHARE", 2000);
-        });
-    }
-
-    window.onload = function() {
-        const params = new URLSearchParams(window.location.search);
-        const v = params.get('v');
-        if(v) { try { startPlayer(atob(v)); } catch(e) {} }
     }
 </script>
 </body>
