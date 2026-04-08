@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spider PLAYER PRO</title>
+    <title>Spider PLAYER LIVE</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -20,11 +20,7 @@
         #inputArea { background: #111; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #222; }
         input { width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 15px; outline: none; box-sizing: border-box; }
         .play-btn { width: 100%; padding: 15px; background: #ff0000; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
-        
-        /* Full screen fixes */
         .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; position: relative; }
-        .plyr--fullscreen-fallback { height: 100vh !important; width: 100vw !important; }
-        
         .share-btn { width: 100%; margin-top: 20px; background: #007bff; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
@@ -32,25 +28,19 @@
 
 <div class="container">
     <div id="inputArea">
-        <h2 style="color: #ff0000;">SPIDER SECURE PRO</h2>
-        <input type="text" id="linkInput" placeholder="Paste Secret Link (m3u8 or mp4)...">
-        <button class="play-btn" onclick="handleManualPlay()">SECURE PLAY</button>
+        <h2 style="color: #ff0000;">SPIDER LIVE PRO</h2>
+        <input type="text" id="linkInput" placeholder="Paste Live Class Link...">
+        <button class="play-btn" onclick="handleManualPlay()">JOIN LIVE CLASS</button>
     </div>
 
     <div id="playerWrapper" class="player-wrapper">
         <video id="videoPlayer" playsinline controls crossorigin="anonymous"></video>
-        <button id="copyBtn" class="share-btn" onclick="copyMaskedLink()">🔗 PROTECT & COPY LINK</button>
+        <button id="copyBtn" class="share-btn" onclick="copyMaskedLink()">🔗 PROTECT & SHARE</button>
     </div>
 </div>
 
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <script>
-    // --- SECURITY LAYER ---
-    document.onkeydown = (e) => {
-        if(e.keyCode == 123 || (e.ctrlKey && e.shiftKey && [73, 67, 74].includes(e.keyCode)) || (e.ctrlKey && e.keyCode == 85)) return false;
-    };
-    setInterval(() => { console.clear(); }, 500);
-
     let player;
     let hls;
     let secureUrl = "";
@@ -65,10 +55,30 @@
 
         if (url.includes('.m3u8') && Hls.isSupported()) {
             if(hls) hls.destroy();
-            hls = new Hls({ maxBufferLength: 60, lowLatencyMode: true });
+            
+            hls = new Hls({
+                // --- LIVE CLASS OPTIMIZATION ---
+                enableWorker: true,
+                lowLatencyMode: true,           // Live ke liye delay kam karega
+                backBufferLength: 60,           // Purana video memory mein rakhega
+                liveSyncDurationCount: 3,       // Live edge se 3 fragments peeche chalega (Buffering rokne ke liye)
+                liveMaxLatencyDurationCount: 10,
+                maxBufferLength: 20,            // 20 sec buffer karega
+                manifestLoadingMaxRetry: 5,     // Agar internet gaya toh 5 baar try karega
+                levelLoadingMaxRetry: 5
+            });
+
             hls.loadSource(url);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, () => setupPlyr(video, hls.levels.map(l => l.height)));
+            
+            // Auto-recovery for Live
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+                    else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+                }
+            });
         } else {
             video.src = url;
             setupPlyr(video, []);
@@ -83,7 +93,7 @@
     function setupPlyr(video, qualities) {
         if(player) player.destroy();
         player = new Plyr(video, {
-            controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'fullscreen'],
+            controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
             settings: ['quality', 'speed'],
             quality: {
                 default: 0,
@@ -93,30 +103,13 @@
             }
         });
 
-        // --- AUTO ROTATE & FULLSCREEN LOGIC ---
+        // Fullscreen Landscape Lock
         player.on('enterfullscreen', () => {
-            if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('landscape').catch(() => {}); 
-            }
+            if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); 
         });
 
         player.on('exitfullscreen', () => {
-            if (screen.orientation && screen.orientation.unlock) {
-                screen.orientation.unlock().catch(() => {});
-            }
-        });
-
-        // Double Tap to Seek
-        video.addEventListener('touchstart', function(e) {
-            let now = new Date().getTime();
-            let lastTouch = video.getAttribute('data-last-touch') || 0;
-            if (now - lastTouch < 300) {
-                let rect = video.getBoundingClientRect();
-                let x = e.touches[0].clientX - rect.left;
-                if (x < rect.width / 2) player.rewind(10);
-                else player.forward(10);
-            }
-            video.setAttribute('data-last-touch', now);
+            if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock().catch(() => {});
         });
 
         video.play().catch(() => {});
@@ -127,8 +120,8 @@
         const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(secureUrl);
         navigator.clipboard.writeText(shareURL).then(() => {
             const btn = document.getElementById('copyBtn');
-            btn.innerText = "✅ PROTECTED & COPIED!";
-            setTimeout(() => btn.innerText = "🔗 PROTECT & COPY LINK", 2000);
+            btn.innerText = "✅ COPIED!";
+            setTimeout(() => btn.innerText = "🔗 PROTECT & SHARE", 2000);
         });
     }
 
