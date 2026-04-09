@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spider PLAYER FINAL</title>
+    <title>Spider PLAYER PRO - FINAL</title>
     
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -14,6 +14,7 @@
             margin: 0; background: #000; color: #fff; font-family: sans-serif; 
             display: flex; align-items: center; justify-content: center; 
             min-height: 100vh; overflow: hidden;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
         }
         .container { width: 100%; max-width: 900px; padding: 15px; }
         #inputArea { background: #111; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #222; }
@@ -25,13 +26,13 @@
         .share-btn:hover { background: #007bff; color: #fff; }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
 
 <div class="container">
     <div id="inputArea">
-        <h2 style="color: #ff0000;">SPIDER SECURE</h2>
-        <input type="text" id="linkInput" placeholder="Paste Video/Live Link...">
-        <button class="play-btn" onclick="handleManualPlay()">START FROM BEGINNING</button>
+        <h2 style="color: #ff0000;">SPIDER PLAYER SECURE</h2>
+        <input type="text" id="linkInput" placeholder="Paste Video or Live Class Link...">
+        <button class="play-btn" onclick="handleManualPlay()">SECURE PLAY (START FROM 0:00)</button>
     </div>
 
     <div id="playerWrapper" class="player-wrapper">
@@ -46,6 +47,7 @@
     let hls;
     let secureUrl = "";
 
+    // 1. Start Player Logic
     function startPlayer(url) {
         if(!url) return;
         secureUrl = url;
@@ -59,20 +61,22 @@
             
             hls = new Hls({
                 enableWorker: true,
-                startPosition: 0,            // Shuruat se chalega
-                liveSyncDuration: 20,        // Buffering fix
-                backBufferLength: 900,       // 15 min tak peeche ja sakte ho
-                maxBufferLength: 40
+                startPosition: 0,            // Har video 0:00 se shuru hogi
+                liveSyncDuration: 20,        // Buffering fix (20s backup)
+                backBufferLength: 900,       // 15 min tak piche ja sakte ho
+                maxBufferLength: 40,
+                autoStartLoad: true
             });
 
             hls.loadSource(url);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                setupPlyr(video, hls.levels.map(l => l.height));
-                video.currentTime = 0; // Double check for 0 start
+                const levels = hls.levels.map(l => l.height);
+                setupPlyr(video, levels);
+                video.currentTime = 0; // Double ensure starting from 0
             });
 
-            // Auto-recovery
+            // Auto-recovery for smooth streaming
             hls.on(Hls.Events.ERROR, (e, d) => {
                 if (d.fatal) {
                     if (d.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
@@ -90,56 +94,72 @@
         if(url) startPlayer(url);
     }
 
+    // 2. Setup Plyr with Quality Options
     function setupPlyr(video, qualities) {
         if(player) player.destroy();
+
+        // Quality list taiyar karna (0 = Auto)
+        const qualityOptions = qualities.length > 0 ? [0, ...qualities] : [0];
+
         player = new Plyr(video, {
             controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings', 'fullscreen'],
             settings: ['quality', 'speed'],
+            quality: {
+                default: 0,
+                options: qualityOptions,
+                forced: true,
+                onChange: (q) => {
+                    if (hls) {
+                        if (q === 0) hls.currentLevel = -1; // Auto
+                        else {
+                            hls.levels.forEach((lvl, idx) => {
+                                if (lvl.height === q) hls.currentLevel = idx;
+                            });
+                        }
+                    }
+                }
+            },
+            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
             seekTime: 10
         });
 
-        // Rotation lock
+        // Auto-Rotate Landscape in Fullscreen
         player.on('enterfullscreen', () => {
-            if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); 
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+        });
+
+        player.on('exitfullscreen', () => {
+            if (screen.orientation && screen.orientation.unlock) {
+                screen.orientation.unlock().catch(() => {});
+            }
         });
 
         video.play().catch(() => {});
     }
 
-    // --- COPY & SHARE LOGIC ---
+    // 3. Share & Copy Logic
     function copyMaskedLink() {
         if(!secureUrl) return;
-        
-        // Isse link "Spider Secure" format mein convert ho jayegi
         const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(secureUrl);
         
-        // Modern Clipboard API
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(shareURL).then(() => {
-                updateBtnStatus();
-            }).catch(() => {
-                fallbackCopy(shareURL);
-            });
+            navigator.clipboard.writeText(shareURL).then(() => updateBtnStatus());
         } else {
-            fallbackCopy(shareURL);
-        }
-    }
-
-    function fallbackCopy(text) {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = shareURL;
+            document.body.appendChild(textArea);
+            textArea.select();
             document.execCommand('copy');
+            document.body.removeChild(textArea);
             updateBtnStatus();
-        } catch (err) {}
-        document.body.removeChild(textArea);
+        }
     }
 
     function updateBtnStatus() {
         const btn = document.getElementById('copyBtn');
-        btn.innerText = "✅ LINK COPIED!";
+        btn.innerText = "✅ LINK PROTECTED & COPIED!";
         btn.style.borderColor = "#28a745";
         btn.style.color = "#28a745";
         setTimeout(() => {
