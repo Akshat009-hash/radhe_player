@@ -2,177 +2,83 @@
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spider PLAYER PRO - FINAL</title>
-    
+    <meta name="referrer" content="no-referrer">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spider Player Pro - Quality Fix</title>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    
     <style>
         :root { --plyr-color-main: #ff0000; }
-        body { 
-            margin: 0; background: #000; color: #fff; font-family: sans-serif; 
-            display: flex; align-items: center; justify-content: center; 
-            min-height: 100vh; overflow: hidden;
-            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
-        }
-        .container { width: 100%; max-width: 900px; padding: 15px; }
-        #inputArea { background: #111; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #222; }
-        input { width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 15px; width: 100%; box-sizing: border-box; outline: none; }
-        .play-btn { width: 100%; padding: 15px; background: #ff0000; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
-        
-        .player-wrapper { display: none; width: 100%; border-radius: 15px; overflow: hidden; background: #000; position: relative; }
-        .share-btn { width: 100%; margin-top: 15px; background: #222; color: #007bff; border: 1px solid #007bff; padding: 12px; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .share-btn:hover { background: #007bff; color: #fff; }
+        body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .container { width: 100%; max-width: 900px; }
+        .player-wrapper { border-radius: 12px; overflow: hidden; }
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
 
 <div class="container">
-    <div id="inputArea">
-        <h2 style="color: #ff0000;">SPIDER PLAYER SECURE</h2>
-        <input type="text" id="linkInput" placeholder="Paste Video or Live Class Link...">
-        <button class="play-btn" onclick="handleManualPlay()">SECURE PLAY (START FROM 0:00)</button>
-    </div>
-
-    <div id="playerWrapper" class="player-wrapper">
-        <video id="videoPlayer" playsinline controls crossorigin="anonymous"></video>
-        <button id="copyBtn" class="share-btn" onclick="copyMaskedLink()">🔗 PROTECT & COPY SHARE LINK</button>
+    <div class="player-wrapper">
+        <video id="player" playsinline controls></video>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+
 <script>
-    let player;
-    let hls;
-    let secureUrl = "";
+    const video = document.getElementById('player');
+    const v = new URLSearchParams(window.location.search).get('v');
 
-    // 1. Start Player Logic
-    function startPlayer(url) {
-        if(!url) return;
-        secureUrl = url;
-        document.getElementById('inputArea').style.display = 'none';
-        document.getElementById('playerWrapper').style.display = 'block';
+    if (v) {
+        let url = v.includes('http') ? v : atob(v);
 
-        const video = document.getElementById('videoPlayer');
-
-        if (url.includes('.m3u8') && Hls.isSupported()) {
-            if(hls) hls.destroy();
-            
-            hls = new Hls({
-                enableWorker: true,
-                startPosition: 0,            // Har video 0:00 se shuru hogi
-                liveSyncDuration: 20,        // Buffering fix (20s backup)
-                backBufferLength: 900,       // 15 min tak piche ja sakte ho
-                maxBufferLength: 40,
-                autoStartLoad: true
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                liveSyncDuration: 30,
+                capLevelToPlayerSize: true // Performance ke liye
             });
 
             hls.loadSource(url);
             hls.attachMedia(video);
+
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                const levels = hls.levels.map(l => l.height);
-                setupPlyr(video, levels);
-                video.currentTime = 0; // Double ensure starting from 0
-            });
+                // Saari available qualities nikaalna
+                const availableQualities = hls.levels.map((l) => l.height);
+                availableQualities.unshift(0); // 'Auto' option ke liye
 
-            // Auto-recovery for smooth streaming
-            hls.on(Hls.Events.ERROR, (e, d) => {
-                if (d.fatal) {
-                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-                    else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-                }
-            });
-        } else {
-            video.src = url;
-            setupPlyr(video, []);
-        }
-    }
+                const player = new Plyr(video, {
+                    settings: ['quality', 'speed'],
+                    quality: {
+                        default: 0,
+                        options: availableQualities,
+                        forced: true,
+                        onChange: (e) => updateQuality(e),
+                    },
+                    speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+                });
 
-    function handleManualPlay() {
-        const url = document.getElementById('linkInput').value.trim();
-        if(url) startPlayer(url);
-    }
-
-    // 2. Setup Plyr with Quality Options
-    function setupPlyr(video, qualities) {
-        if(player) player.destroy();
-
-        // Quality list taiyar karna (0 = Auto)
-        const qualityOptions = qualities.length > 0 ? [0, ...qualities] : [0];
-
-        player = new Plyr(video, {
-            controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings', 'fullscreen'],
-            settings: ['quality', 'speed'],
-            quality: {
-                default: 0,
-                options: qualityOptions,
-                forced: true,
-                onChange: (q) => {
-                    if (hls) {
-                        if (q === 0) hls.currentLevel = -1; // Auto
-                        else {
-                            hls.levels.forEach((lvl, idx) => {
-                                if (lvl.height === q) hls.currentLevel = idx;
-                            });
-                        }
+                function updateQuality(newQuality) {
+                    if (newQuality === 0) {
+                        hls.currentLevel = -1; // Auto quality
+                        console.log("Quality set to Auto");
+                    } else {
+                        hls.levels.forEach((level, levelIndex) => {
+                            if (level.height === newQuality) {
+                                hls.currentLevel = levelIndex;
+                                console.log("Quality set to: " + newQuality);
+                            }
+                        });
                     }
                 }
-            },
-            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
-            seekTime: 10
-        });
+            });
 
-        // Auto-Rotate Landscape in Fullscreen
-        player.on('enterfullscreen', () => {
-            if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('landscape').catch(() => {});
-            }
-        });
-
-        player.on('exitfullscreen', () => {
-            if (screen.orientation && screen.orientation.unlock) {
-                screen.orientation.unlock().catch(() => {});
-            }
-        });
-
-        video.play().catch(() => {});
-    }
-
-    // 3. Share & Copy Logic
-    function copyMaskedLink() {
-        if(!secureUrl) return;
-        const shareURL = window.location.origin + window.location.pathname + "?v=" + btoa(secureUrl);
-        
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(shareURL).then(() => updateBtnStatus());
-        } else {
-            const textArea = document.createElement("textarea");
-            textArea.value = shareURL;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            updateBtnStatus();
+            // Error recovery logic
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+                    else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+                }
+            });
         }
-    }
-
-    function updateBtnStatus() {
-        const btn = document.getElementById('copyBtn');
-        btn.innerText = "✅ LINK PROTECTED & COPIED!";
-        btn.style.borderColor = "#28a745";
-        btn.style.color = "#28a745";
-        setTimeout(() => {
-            btn.innerText = "🔗 PROTECT & COPY SHARE LINK";
-            btn.style.borderColor = "#007bff";
-            btn.style.color = "#007bff";
-        }, 2000);
-    }
-
-    window.onload = function() {
-        const params = new URLSearchParams(window.location.search);
-        const v = params.get('v');
-        if(v) { try { startPlayer(atob(v)); } catch(e) {} }
     }
 </script>
 </body>
