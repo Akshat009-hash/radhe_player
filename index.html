@@ -4,27 +4,93 @@
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider Player Pro - Quality Fix</title>
+    <title>Spider Player Pro</title>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <style>
-        :root { --plyr-color-main: #ff0000; }
-        body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-        .container { width: 100%; max-width: 900px; }
-        .player-wrapper { border-radius: 12px; overflow: hidden; }
+        :root { --plyr-color-main: #ff0000; --tg-color: #24A1DE; }
+        body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; }
+        .container { width: 100%; max-width: 900px; padding: 10px; }
+        .player-wrapper { border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(255,0,0,0.2); }
+        
+        /* Telegram Button Style */
+        .tg-button {
+            display: block;
+            width: 100%;
+            margin-top: 15px;
+            padding: 12px;
+            background: var(--tg-color);
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .tg-button:hover { opacity: 0.9; }
+
+        /* Popup Styles */
+        #tgPopup {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999;
+        }
+        .popup-content {
+            background: #222;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            position: relative;
+            max-width: 300px;
+            border: 1px solid #444;
+        }
+        .close-btn {
+            position: absolute;
+            top: 10px; right: 15px;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 20px;
+        }
+        .popup-btn {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 8px 20px;
+            background: var(--tg-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
+
+<div id="tgPopup">
+    <div class="popup-content">
+        <span class="close-btn" onclick="closePopup()">&times;</span>
+        <h3>Join Our Channel</h3>
+        <p>Latest updates aur lectures ke liye Telegram join karein!</p>
+        <a href="https://t.me/SPIDERR67" target="_blank" class="popup-btn">Join Now</a>
+    </div>
+</div>
 
 <div class="container">
     <div class="player-wrapper">
         <video id="player" playsinline controls></video>
     </div>
+    <a href="https://t.me/SPIDERR67" target="_blank" class="tg-button">Join Telegram Channel</a>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 
 <script>
+    // Popup Close Function
+    function closePopup() {
+        document.getElementById('tgPopup').style.display = 'none';
+    }
+
     const video = document.getElementById('player');
     const v = new URLSearchParams(window.location.search).get('v');
 
@@ -34,16 +100,15 @@
         if (Hls.isSupported()) {
             const hls = new Hls({
                 liveSyncDuration: 30,
-                capLevelToPlayerSize: true // Performance ke liye
+                capLevelToPlayerSize: true 
             });
 
             hls.loadSource(url);
             hls.attachMedia(video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                // Saari available qualities nikaalna
                 const availableQualities = hls.levels.map((l) => l.height);
-                availableQualities.unshift(0); // 'Auto' option ke liye
+                availableQualities.unshift(0); 
 
                 const player = new Plyr(video, {
                     settings: ['quality', 'speed'],
@@ -58,20 +123,17 @@
 
                 function updateQuality(newQuality) {
                     if (newQuality === 0) {
-                        hls.currentLevel = -1; // Auto quality
-                        console.log("Quality set to Auto");
+                        hls.currentLevel = -1;
                     } else {
                         hls.levels.forEach((level, levelIndex) => {
                             if (level.height === newQuality) {
                                 hls.currentLevel = levelIndex;
-                                console.log("Quality set to: " + newQuality);
                             }
                         });
                     }
                 }
             });
 
-            // Error recovery logic
             hls.on(Hls.Events.ERROR, (event, data) => {
                 if (data.fatal) {
                     if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
